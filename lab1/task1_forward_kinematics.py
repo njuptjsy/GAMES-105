@@ -67,7 +67,6 @@ def part3_retarget(viewer, T_pose_bvh_path, A_pose_bvh_path):
     viewer.update_func = handle.update_func
     viewer.run()
 
-
 def main():
     # create a viewer
     viewer = SimpleViewer()
@@ -79,7 +78,7 @@ def main():
 
     # part2
     # part2_one_pose(viewer, bvh_file_path)
-    # part2_animation(viewer, bvh_file_path)
+    # part2_animation(viewer, "data/A_pose_run.bvh")
 
     # part3
     part3_retarget(viewer, "data/walk60.bvh", "data/A_pose_run.bvh")
