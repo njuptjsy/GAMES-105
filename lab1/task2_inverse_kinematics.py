@@ -26,12 +26,12 @@ class MetaData:
             你可能会需要这两个输出。
         """
         
-        # 从end节点开始，一直往上找，直到找到腰部节点
+        # 从end节点开始，一直往上找，直到找到腰部节点root
         path1 = [self.joint_name.index(self.end_joint)]
         while self.joint_parent[path1[-1]] != -1:
             path1.append(self.joint_parent[path1[-1]])
             
-        # 从root节点开始，一直往上找，直到找到腰部节点
+        # 从start节点开始，一直往上找，直到找到腰部节点root
         path2 = [self.joint_name.index(self.root_joint)]
         while self.joint_parent[path2[-1]] != -1:
             path2.append(self.joint_parent[path2[-1]])
@@ -47,11 +47,10 @@ class MetaData:
         return path, path_name, path1, path2
     
 
-
-
 def part1_simple(viewer, target_pos):
     """
-    完成part1_inverse_kinematics，我们将根节点设在腰部，末端节点设在左手
+    起始点设在腰部，也就是根节点
+    末端节点设在左手
     """
     viewer.create_marker(target_pos, [1, 0, 0, 1])
     joint_name, joint_parent, joint_initial_position = viewer.get_meta_data()
@@ -67,7 +66,8 @@ def part1_simple(viewer, target_pos):
 
 def part1_hard(viewer, target_pos):
     """
-    完成part1_inverse_kinematics，我们将根节点设在**左脚部**，末端节点设在左手
+    起始点设在**左脚部**
+    末端节点设在左手
     """
     viewer.create_marker(target_pos, [1, 0, 0, 1])
     joint_name, joint_parent, joint_initial_position = viewer.get_meta_data()
@@ -173,7 +173,7 @@ def main():
     # part1_animation(viewer, np.array([0.5, 0.5, 0.5]))
     
     # part2
-    # part2(viewer, 'data/walk60.bvh')
+    part2(viewer, 'data/walk60.bvh')
     
     # bonus(viewer, np.array([0.5, 0.5, 0.5]), np.array([0, 0.5, 0.5]))
 
