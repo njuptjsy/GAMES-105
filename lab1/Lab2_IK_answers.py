@@ -1,6 +1,20 @@
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
+def FABR(meta_data, joint_positions, joint_orientations, target_pose):
+    path_positions = []
+    path_offsets = []
+    path_orientations = []
+
+    return path_positions, path_orientations
+
+def GradientDescent(meta_data, joint_positions, joint_orientations, target_pose):
+    path_positions = []
+    path_offsets = []
+    path_orientations = []
+    
+    return path_positions, path_orientations
+
 def CCD(meta_data, joint_positions, joint_orientations, target_pose):
     # 构建IK链
     path, path_name, path1, path2 = meta_data.get_path_from_root_to_end()
@@ -76,7 +90,7 @@ def part1_inverse_kinematics(meta_data, joint_positions, joint_orientations, tar
     """
     path_positions, path_orientations = CCD(meta_data, joint_positions, joint_orientations, target_pose)
 
-    path, path_name, path1, path2 = meta_data.get_path_from_root_to_end()
+    path, path_name, path1, path2 = meta_data.get_path_from_root_to_end()#path1 endeffect到root前一个 path2 starteffect 到 root
 
     # 计算 path_joints 的旋转
     joint_rotations = R.identity(len(meta_data.joint_name))
@@ -86,15 +100,20 @@ def part1_inverse_kinematics(meta_data, joint_positions, joint_orientations, tar
         else:
             joint_rotations[i] = R.inv(R.from_quat(joint_orientations[meta_data.joint_parent[i]])) * R.from_quat(joint_orientations[i])
     
-    # 更新path_joints 的 朝向和位置
-     # path_joints 的 forwar_kinematics
-    for j in range(len(path)):
-        joint_positions[path[j]] = path_positions[j]
-        joint_orientations[path[j]] = path_orientations[j].as_quat()
-
+    # 更新path_joints 的 朝向和位置 
+    # 注意如果IK路径穿过根节点，path2的旋转要从子关节赋给父关节
+    if 0 in path:
+        for i in range(len(path2) - 1):
+            joint_orientations[path2[i + 1]] = path_orientations[i].as_quat()
+        joint_orientations[path2[-1]] = path_orientations[len(path2) - 1].as_quat()
+        for i in range(len(path1) - 1):
+            joint_orientations[path1[~i]] = path_orientations[i + len(path2)].as_quat()
+    else:
+        for i in range(len(path)):
+            joint_orientations[path[i]] = path_orientations[i].as_quat()
+            
     for i in range(len(path)):
         joint_positions[path[i]] = path_positions[i]
-
     # 其余 joints 的 forward_kinematics
     for i in range(len(meta_data.joint_parent)):
         if meta_data.joint_parent[i] == -1:
