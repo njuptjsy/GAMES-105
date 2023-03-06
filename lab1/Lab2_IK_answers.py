@@ -1,18 +1,97 @@
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
-def FABR(meta_data, joint_positions, joint_orientations, target_pose):
-    path_positions = []
-    path_offsets = []
-    path_orientations = []
-
-    return path_positions, path_orientations
-
 def GradientDescent(meta_data, joint_positions, joint_orientations, target_pose):
     path_positions = []
     path_offsets = []
     path_orientations = []
-    
+    path, path_name, path1, path2 = meta_data.get_path_from_root_to_end()
+    for joint in path:
+        path_positions.append(joint_positions[joint])
+    path_offsets.append(np.array([0., 0., 0.]))
+    for i in range(len(path) - 1):#计算每个关节的局部offset
+        path_offsets.append(meta_data.joint_initial_position[path[i + 1]] - meta_data.joint_initial_position[path[i]])
+
+
+
+    return path_positions, path_orientations
+
+def FABR(meta_data, joint_positions, joint_orientations, target_pose):
+    path_positions = []
+    path_offsets = []
+    path_orientations = []
+    path_positions_old = []
+
+    path, path_name, _, _ = meta_data.get_path_from_root_to_end()
+    for joint in path:
+        path_positions.append(joint_positions[joint])
+        path_orientations.append(R.from_quat(joint_orientations[joint]))
+    path_positions_old = path_positions.copy()
+    length = []
+    total_length = 0
+    path_offsets.append(np.array([0., 0., 0.]))
+    for i in range(len(path) - 1):#计算每个关节的局部offset
+        offset = meta_data.joint_initial_position[path[i + 1]] - meta_data.joint_initial_position[path[i]]
+        path_offsets.append(offset)
+        length.append(np.linalg.norm(offset))
+        total_length += np.linalg.norm(offset)
+    begin_target_dis = target_pose - path_positions[0]
+
+    if total_length <= np.linalg.norm(begin_target_dis):# cannot reach
+        dir = begin_target_dis / np.linalg.norm(begin_target_dis)
+        for i in range(len(path_positions)-1):
+            path_positions[i+1] = path_positions[i] * dir * length[i]
+    else:
+        cnt = 0
+        end_index = path_name.index(meta_data.end_joint)
+        while (np.linalg.norm(path_positions[end_index] - target_pose) >= 1e-2 and cnt <= 10):#最大迭代次数10
+            moveTo = target_pose
+            start_pos = path_positions[0]
+            #前向
+            i = (len(path_positions) - 1)
+            while (i > 0):
+                path_positions[i] = moveTo
+                dir = path_positions[i - 1] - path_positions[i]
+                dir = dir / np.linalg.norm(dir)
+                moveTo = path_positions[i] + dir * length[i-1]
+                i -= 1
+            #补上第一个位置
+            path_positions[0] = moveTo
+            moveTo = start_pos
+            #后向
+            i = 0
+            while ( i < len(path_positions) - 1):
+                path_positions[i] = moveTo
+                dir = path_positions[i+1] - path_positions[i]
+                dir = dir / np.linalg.norm(dir)
+                moveTo = path_positions[i] + dir * length[i]
+                i += 1
+            path_positions[i] = moveTo
+            cnt += 1
+        #根据位置计算旋转
+        path_rotations = []
+        path_rotations.append(path_orientations[0])
+        for j in range(len(path_orientations) - 1):
+            path_rotations.append(R.inv(path_orientations[j]) * path_orientations[j + 1])#求出每个子关节相对于父关节的局部R
+
+        for i in range(len(path_positions) - 1):
+            new_dir = path_positions[i+1] - path_positions[i]
+            new_dir = new_dir / np.linalg.norm(new_dir)
+            old_dir = path_positions_old[i+1] - path_positions_old[i]
+            old_dir = old_dir / np.linalg.norm(old_dir)
+            # 计算轴角
+            rotation_radius = np.arccos(np.clip(np.dot(old_dir,new_dir), -1, 1))
+            temp_axis = np.cross(old_dir,new_dir)
+            rotation_axis = temp_axis / np.linalg.norm(temp_axis)
+            rotation_vector = R.from_rotvec(rotation_radius * rotation_axis)
+            path_orientations[i] = rotation_vector * path_orientations[i]#旋转关节
+            
+            for j in range(i, len(path)-1):
+                path_positions_old[j + 1] = path_positions_old[j] + path_orientations[j].apply(path_offsets[j + 1])#从current_index开始做accumulate
+                if j + 1 < end_index:
+                    path_orientations[j + 1] = path_orientations[j] * path_rotations[j + 1]#根据子关节旋转和父朝向计算子朝向
+                else:
+                    path_orientations[j + 1] = path_orientations[j]
     return path_positions, path_orientations
 
 def CCD(meta_data, joint_positions, joint_orientations, target_pose):
@@ -63,9 +142,9 @@ def CCD(meta_data, joint_positions, joint_orientations, target_pose):
             # 计算方位与位置
             path_orientations[current_index] = rotation_vector * path_orientations[current_index]#旋转关节
             path_rotations = []
-            path_rotations.append(path_orientations[0])#root也不旋转
+            path_rotations.append(path_orientations[0])
             for j in range(len(path_orientations) - 1):
-                path_rotations.append(R.inv(path_orientations[j]) * path_orientations[j + 1])#求出每个关节相对于父关节的局部R
+                path_rotations.append(R.inv(path_orientations[j]) * path_orientations[j + 1])#求出每个子关节相对于父关节的局部R
             for j in range(current_index, end_index):
                 path_positions[j + 1] = path_positions[j] + path_orientations[j].apply(path_offsets[j + 1])#从current_index开始做accumulate
                 if j + 1 < end_index:
@@ -88,7 +167,8 @@ def part1_inverse_kinematics(meta_data, joint_positions, joint_orientations, tar
         joint_positions: 计算得到的关节位置，是一个numpy数组，shape为(M, 3)，M为关节数
         joint_orientations: 计算得到的关节朝向，是一个numpy数组，shape为(M, 4)，M为关节数
     """
-    path_positions, path_orientations = CCD(meta_data, joint_positions, joint_orientations, target_pose)
+    path_positions, path_orientations = FABR(meta_data, joint_positions, joint_orientations, target_pose)
+    #path_positions, path_orientations = CCD(meta_data, joint_positions, joint_orientations, target_pose)
 
     path, path_name, path1, path2 = meta_data.get_path_from_root_to_end()#path1 endeffect到root前一个 path2 starteffect 到 root
 
@@ -137,9 +217,9 @@ def part2_inverse_kinematics(meta_data, joint_positions, joint_orientations, rel
             break
     root_pos = joint_positions[root_idx]
     root_orientations = joint_orientations[root_idx]
-    target_offsetsXZ = np.array([relative_x, target_height, relative_z])
-    target_offsetsY = np.array([0., target_height, 0.])
-    target_pose = root_pos + R.from_quat(root_orientations).apply(target_offsetsXZ) + target_offsetsY
+    target_offsetsXZ = np.array([relative_x, 0., relative_z])
+    target_pose = root_pos + R.from_quat(root_orientations).apply(target_offsetsXZ)
+    target_pose[1,] = target_height
     joint_positions, joint_orientations = part1_inverse_kinematics(meta_data, joint_positions, joint_orientations, target_pose)
     return joint_positions, joint_orientations
 
