@@ -1,20 +1,6 @@
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-
-def GradientDescent(meta_data, joint_positions, joint_orientations, target_pose):
-    path_positions = []
-    path_offsets = []
-    path_orientations = []
-    path, path_name, path1, path2 = meta_data.get_path_from_root_to_end()
-    for joint in path:
-        path_positions.append(joint_positions[joint])
-    path_offsets.append(np.array([0., 0., 0.]))
-    for i in range(len(path) - 1):#计算每个关节的局部offset
-        path_offsets.append(meta_data.joint_initial_position[path[i + 1]] - meta_data.joint_initial_position[path[i]])
-
-
-
-    return path_positions, path_orientations
+from answer import *
 
 def FABR(meta_data, joint_positions, joint_orientations, target_pose):
     path_positions = []
@@ -167,9 +153,10 @@ def part1_inverse_kinematics(meta_data, joint_positions, joint_orientations, tar
         joint_positions: 计算得到的关节位置，是一个numpy数组，shape为(M, 3)，M为关节数
         joint_orientations: 计算得到的关节朝向，是一个numpy数组，shape为(M, 4)，M为关节数
     """
-    path_positions, path_orientations = FABR(meta_data, joint_positions, joint_orientations, target_pose)
+    #path_positions, path_orientations = FABR(meta_data, joint_positions, joint_orientations, target_pose)
     #path_positions, path_orientations = CCD(meta_data, joint_positions, joint_orientations, target_pose)
-
+    path_positions, path_orientations = gradientDescent(meta_data, joint_positions, joint_orientations, target_pose)
+    
     path, path_name, path1, path2 = meta_data.get_path_from_root_to_end()#path1 endeffect到root前一个 path2 starteffect 到 root
 
     # 计算 path_joints 的旋转
