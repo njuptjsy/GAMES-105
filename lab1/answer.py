@@ -32,11 +32,11 @@ def getJointPathInfo(meta_data, joint_positions, joint_orientations):
 def cyclicCoordinateDescent(meta_data, joint_positions, joint_orientations, target_pose):
     # 计算 inverse_kinematics 链的信息
     path_offsets, path_positions, path_orientations = getJointPathInfo(meta_data, joint_positions, joint_orientations)
-
+    path, path_name, path1, path2 = meta_data.get_path_from_root_to_end()
     # CCD 循环
     cnt = 0
-    end_index = meta_data.path_name.index(meta_data.end_joint)
-    while (np.linalg.norm(joint_positions[meta_data.path[end_index]] - target_pose) >= 1e-2 and cnt <= 10):
+    end_index = path_name.index(meta_data.end_joint)
+    while (np.linalg.norm(joint_positions[path[end_index]] - target_pose) >= 1e-2 and cnt <= 100):
         for i in range(end_index):
             current_index = i
             # current_index = end_index - i - 1
@@ -69,6 +69,7 @@ def cyclicCoordinateDescent(meta_data, joint_positions, joint_orientations, targ
                 else:
                     path_orientations[j + 1] = path_orientations[j]
         cnt += 1
+    print(cnt)
     return path_positions, path_orientations
 
 
@@ -195,9 +196,10 @@ def gaussNewtonMethod(meta_data, joint_positions, joint_orientations, target_pos
         alphaUp = result.transpose().dot(delta)
         alphaBottom = result.transpose().dot(result)
         alpha = 32 * alphaUp / alphaBottom
+        alpha = 32
         print(alpha)
 
-        # theta = theta_0 - alpha J^T (JJ^T)^-1 delta
+        # theta = theta_0 - J^T (JJ^T)^-1 delta
         temp = np.linalg.inv(np.dot(jacobian, jacobian.transpose()))
         temp = np.dot(jacobian.transpose(), temp)
         delta_theta = alpha * np.dot(temp, delta)#J^T (JJ^T)^-1
@@ -220,6 +222,9 @@ def dampedGaussNewtonMethod(meta_data, joint_positions, joint_orientations, targ
     end_index = path_name.index(meta_data.end_joint)
     count = 0
     lambda_ = 100
+    increase = 10
+    decrease = 0.1
+    leastTheta = []
     while (np.linalg.norm(path_positions[end_index] - target_pose) >= 1e-2 and count <= 100):
         end_position = path_positions[end_index]
         joint_angle = calculateJointAngle(path_orientations)
@@ -228,12 +233,8 @@ def dampedGaussNewtonMethod(meta_data, joint_positions, joint_orientations, targ
         print(np.linalg.norm(delta))
         # get all path rotations, convert to XYZ euler angle
         theta = np.concatenate(joint_angle, axis=0).transpose().reshape(-1, 1)
-
-        JacobianSquare = np.dot(jacobian, jacobian.transpose())
-        result = np.dot(JacobianSquare, delta)
-        alphaUp = result.transpose().dot(delta)
-        alphaBottom = result.transpose().dot(result)
-        alpha = 32 * alphaUp / alphaBottom
+        leastTheta = theta
+        alpha = 32
         print(alpha)
         # theta = theta_0 - alpha J^T (JJ^T + lambda W)^-1 delta
         jacobianSquare = np.dot(jacobian, jacobian.transpose())
@@ -242,6 +243,11 @@ def dampedGaussNewtonMethod(meta_data, joint_positions, joint_orientations, targ
         temp = np.dot(jacobian.transpose(), temp)
         delta = alpha * np.dot(temp, delta)
         theta = theta - delta
+        if(np.linalg.norm(delta) > np.linalg.norm(leastTheta)):
+            lambda_ = increase * lambda_
+        else:
+            lambda_ = decrease * lambda_
+
 
         # convert theta back to rotations
         path_positions, path_orientations = calculateJointPathInJacobian(theta, end_index, path_offsets, path_positions, path_orientations)

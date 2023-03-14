@@ -54,6 +54,7 @@ def FABR(meta_data, joint_positions, joint_orientations, target_pose):
                 i += 1
             path_positions[i] = moveTo
             cnt += 1
+        print(cnt)
         #根据位置计算旋转
         path_rotations = []
         path_rotations.append(path_orientations[0])
@@ -138,7 +139,7 @@ def CCD(meta_data, joint_positions, joint_orientations, target_pose):
                 else:
                     path_orientations[j + 1] = path_orientations[j]
         cnt += 1
-
+    print(cnt)
     return path_positions, path_orientations
 
 def part1_inverse_kinematics(meta_data, joint_positions, joint_orientations, target_pose):
@@ -155,7 +156,7 @@ def part1_inverse_kinematics(meta_data, joint_positions, joint_orientations, tar
     """
     #path_positions, path_orientations = FABR(meta_data, joint_positions, joint_orientations, target_pose)
     #path_positions, path_orientations = CCD(meta_data, joint_positions, joint_orientations, target_pose)
-    path_positions, path_orientations = gradientDescent(meta_data, joint_positions, joint_orientations, target_pose)
+    path_positions, path_orientations = dampedGaussNewtonMethod(meta_data, joint_positions, joint_orientations, target_pose)
     
     path, path_name, path1, path2 = meta_data.get_path_from_root_to_end()#path1 endeffect到root前一个 path2 starteffect 到 root
 
